@@ -84,6 +84,7 @@ class ProtobufEditor(IMessageEditorTab):
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
 
+        output = error = None
         try:
             output, error = process.communicate(body)
         except OSError:
@@ -93,7 +94,7 @@ class ProtobufEditor(IMessageEditorTab):
                 process.kill()
 
         if error:
-            raise Exception(err)
+            raise Exception(error)
 
         self.editor.setText(output)
         # no current way to reserialize a message without a proto descriptor
