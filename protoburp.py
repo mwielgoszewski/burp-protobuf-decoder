@@ -13,15 +13,24 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
         self.callbacks = callbacks
         self.helpers = callbacks.getHelpers()
 
+        self.enabled = False
+        try:
+            process = subprocess.Popen(['protoc', '--version'],
+                                       stdin=subprocess.PIPE,
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
+            output, error = process.communicate()
+            self.enabled = output.startswith('libprotoc')
+            if error:
+                raise RuntimeError(error)
+        except (OSError, RuntimeError) as error:
+            self.callbacks.getStderr().write(
+                    "Error calling protoc: %s" % (error.message, ))
+            return
+
         callbacks.setExtensionName(self.EXTENSION_NAME)
         callbacks.registerMessageEditorTabFactory(self)
 
-        self.enabled = False
-        code = subprocess.check_call(['protoc', '--version'],
-                                     stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE)
-        self.enabled = code == 0
         return
 
     def createNewInstance(self, controller, editable):
