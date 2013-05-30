@@ -14,6 +14,10 @@ Prerequisites
 Install
 -------
 
+1. In Burp Extender tab under Options > Python Environment,
+    specify *Lib* as a folder for loading modules (or add contents of *Lib*
+    to whatever folder you've already specified).
+
 1. In Burp Extender tab, click Add
 1. Select the Extension type: Python
 1. Select the `protoburp.py` file
