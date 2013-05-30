@@ -1,9 +1,25 @@
 # -*- coding: utf-8 -*-
+from collections import OrderedDict
+import importlib
+import os
+import shutil
 import subprocess
-from burp import IBurpExtender, IMessageEditorTab, IMessageEditorTabFactory
+import sys
+import tempfile
+
+from burp import IBurpExtender, IMessageEditorTab, IMessageEditorTabFactory, ITab
+
+from google.protobuf.reflection import ParseMessage as parse_message
+from google.protobuf.text_format import Merge as merge_message
+
+from java.awt.event import ActionListener, MouseAdapter
+from java.io import FileFilter
+from javax.swing import JButton, JFileChooser, JMenu, JMenuItem, JOptionPane, JPanel, JPopupMenu
+from javax.swing.filechooser import FileNameExtensionFilter
 
 
 CONTENT_PROTOBUF = 'application/x-protobuf'
+PROTO_FILENAME_EXTENSION_FILTER = FileNameExtensionFilter("*.proto, *.py", ["proto", "py"])
 
 
 class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
@@ -14,6 +30,7 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
         self.helpers = callbacks.getHelpers()
 
         self.enabled = False
+
         try:
             process = subprocess.Popen(['protoc', '--version'],
                                        stdin=subprocess.PIPE,
@@ -21,23 +38,33 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
                                        stderr=subprocess.PIPE)
             output, error = process.communicate()
             self.enabled = output.startswith('libprotoc')
+
             if error:
                 raise RuntimeError(error)
+
         except (OSError, RuntimeError) as error:
             self.callbacks.getStderr().write(
                     "Error calling protoc: %s" % (error.message, ))
+
+        if not self.enabled:
             return
+
+        self.descriptors = OrderedDict()
 
         callbacks.setExtensionName(self.EXTENSION_NAME)
         callbacks.registerMessageEditorTabFactory(self)
 
+        # Holding off on adding an extension tab until more advanced
+        # options are introduced.
+
+        #callbacks.addSuiteTab(ProtobufTab(self))
         return
 
     def createNewInstance(self, controller, editable):
-        return ProtobufEditor(self, controller, editable)
+        return ProtobufEditorTab(self, controller, editable)
 
 
-class ProtobufEditor(IMessageEditorTab):
+class ProtobufEditorTab(IMessageEditorTab):
     TAB_CAPTION = "Protobuf"
 
     def __init__(self, extender, controller, editable):
@@ -46,10 +73,22 @@ class ProtobufEditor(IMessageEditorTab):
         self.controller = controller
         self.editable = editable
 
-        self._current = None
+        self.chooser = JFileChooser()
+        self.chooser.addChoosableFileFilter(PROTO_FILENAME_EXTENSION_FILTER)
+        self.chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES)
+        self.chooser.setMultiSelectionEnabled(True)
+
+        self.descriptors = extender.descriptors
+
+        self.listener = LoadProtoActionListener(self)
+
+        self._current = (None, None, None)
 
         self.editor = extender.callbacks.createTextEditor()
         self.editor.setEditable(editable)
+
+        mouseListener = LoadProtoMenuMouseListener(self)
+        self.getUiComponent().addMouseListener(mouseListener)
 
     def getTabCaption(self):
         return self.TAB_CAPTION
@@ -82,11 +121,35 @@ class ProtobufEditor(IMessageEditorTab):
             return
 
         if isRequest:
-            offset = self.helpers.analyzeRequest(content).getBodyOffset()
+            info = self.helpers.analyzeRequest(content)
         else:
-            offset = self.helpers.analyzeResponse(content).getBodyOffset()
+            info = self.helpers.analyzeResponse(content)
 
-        body = content[offset:]
+        body = content[info.getBodyOffset():]
+
+        # Loop through all proto descriptors loaded
+
+        for package, descriptors in self.descriptors.iteritems():
+            for name, descriptor in descriptors.iteritems():
+
+                try:
+                    message = parse_message(descriptor, body.tostring())
+                except Exception:
+                    continue
+
+                # Stop parsing on the first valid message we encounter
+                # this may result in a false positive, so we should still
+                # allow users to specify a proto manually (select from a
+                # context menu).
+
+                if message.IsInitialized():
+                    self.editor.setText(str(message))
+                    self.editor.setEditable(True)
+                    self._current = (content, message, info)
+                    return
+
+        # If we get to this point, then no loaded protos could deserialize
+        # the message. Shelling out to protoc should be a last resort.
 
         process = subprocess.Popen(['protoc', '--decode_raw'],
                                    stdin=subprocess.PIPE,
@@ -100,23 +163,198 @@ class ProtobufEditor(IMessageEditorTab):
             pass
         finally:
             if process.poll() != 0:
-                process.kill()
+                process.wait()
 
         if error:
-            raise Exception(error)
+            self.editor.setText(error)
+        else:
+            self.editor.setText(output)
 
-        self.editor.setText(output)
-        # no current way to reserialize a message without a proto descriptor
-        #self.editor.setEditable(self.editable)
         self.editor.setEditable(False)
-        self._current = content
+        self._current = (content, None, info)
         return
 
     def getMessage(self):
-        return self._current
+        content, message, info = self._current
+
+        if message is not None and self.isModified():
+
+            # store original so we can revert if needed
+
+            original = message.SerializeToString()
+            message.Clear()
+
+            try:
+                merge_message(self.editor.getText().tostring(), message)
+                headers = info.getHeaders()
+                serialized = message.SerializeToString()
+                return self.helpers.buildHttpMessage(headers, serialized)
+
+            except Exception as error:
+                JOptionPane.showMessageDialog(self.getUiComponent(),
+                    error.message, 'Error parsing message!',
+                    JOptionPane.ERROR_MESSAGE)
+
+                # an error occurred while re-serializing the message,
+                # revert back to the original
+
+                message.Clear()
+                message.MergeFromString(original)
+
+        return content
 
     def isModified(self):
         return self.editor.isTextModified()
 
     def getSelectedData(self):
         return self.editor.getSelectedText()
+
+
+class ProtobufTab(ITab):
+    TAB_CAPTION = 'Protobuf'
+
+    def __init__(self, protobufEditor):
+        button = JButton("Load .proto ...")
+        button.addActionListener(protobufEditor.listener)
+        self.panel = JPanel()
+        self.panel.add(button)
+
+    def getTabCaption(self):
+        return self.TAB_CAPTION
+
+    def getUiComponent(self):
+        return self.panel
+
+
+class LoadProtoMenuMouseListener(MouseAdapter):
+    def __init__(self, tab):
+        self.tab = tab
+
+    def mousePressed(self, event):
+        return self.handleMouseEvent(event)
+
+    def mouseReleased(self, event):
+        return self.handleMouseEvent(event)
+
+    def handleMouseEvent(self, event):
+        if event.isPopupTrigger():
+            loadMenu = JMenuItem("Load .proto")
+            loadMenu.addActionListener(self.tab.listener)
+
+            popup = JPopupMenu()
+            popup.add(loadMenu)
+
+            deserializeAsMenu = JMenu("Deserialize As...")
+
+            popup.addSeparator()
+            popup.add(deserializeAsMenu)
+
+            for pb2, descriptors in self.tab.descriptors.iteritems():
+                subMenu = JMenu(pb2)
+                deserializeAsMenu.add(subMenu)
+
+                for name, descriptor in descriptors.iteritems():
+                    protoMenu = JMenuItem(name)
+                    protoMenu.addActionListener(
+                        DeserializeProtoActionListener(self.tab, descriptor))
+
+                    subMenu.add(protoMenu)
+
+            popup.show(event.getComponent(), event.getX(), event.getY())
+
+        return
+
+
+class ListProtoFileFilter(FileFilter):
+    def accept(self, f):
+        basename, ext = os.path.splitext(f.getName())
+        if ext == '.proto' or (ext == '.py' and basename.endswith('_pb2')):
+            return True
+        else:
+            return False
+
+
+class LoadProtoActionListener(ActionListener):
+    def __init__(self, tab):
+        self.chooser = tab.chooser
+        self.descriptors = tab.descriptors
+        self.tab = tab
+
+    def actionPerformed(self, event):
+        if self.chooser.showOpenDialog(None) == JFileChooser.APPROVE_OPTION:
+            modules = []
+
+            for selectedFile in self.chooser.getSelectedFiles():
+                if selectedFile.isDirectory():
+                    self.chooser.setCurrentDirectory(selectedFile)
+
+                    for protoFile in selectedFile.listFiles(ListProtoFileFilter()):
+                        modules.append(compile_and_import_proto(protoFile))
+
+                else:
+                    self.chooser.setCurrentDirectory(selectedFile.getParentFile())
+                    modules.append(compile_and_import_proto(selectedFile))
+
+            for pb2 in modules:
+                descriptors = self.descriptors.setdefault(pb2.__name__, {})
+                descriptors.update(pb2.DESCRIPTOR.message_types_by_name)
+
+        return
+
+
+class DeserializeProtoActionListener(ActionListener):
+    def __init__(self, tab, descriptor):
+        self.tab = tab
+        self.descriptor = descriptor
+
+    def actionPerformed(self, event):
+        content, message, info = self.tab._current
+
+        try:
+            body = content[info.getBodyOffset():]
+            message = parse_message(self.descriptor, body.tostring())
+
+            self.tab.editor.setText(str(message))
+            self.tab.editor.setEditable(True)
+            self._current = (content, message, info)
+
+        except Exception as error:
+            title = "Error parsing message as %s!" % (self.descriptor.name, )
+            JOptionPane.showMessageDialog(self.tab.getUiComponent(),
+                error.message, title, JOptionPane.ERROR_MESSAGE)
+
+        return
+            
+
+def compile_and_import_proto(proto):
+    curdir = os.path.abspath(os.curdir)
+    tempdir = tempfile.mkdtemp()
+
+    if os.path.splitext(proto.getName())[-1] == '.proto':
+        try:
+            os.chdir(os.path.abspath(proto.getParent()))
+            subprocess.check_call(['protoc', '--python_out',
+                                  tempdir, proto.getName()])
+            module = proto.getName().replace('.proto', '_pb2')
+
+        except subprocess.CalledProcessError:
+            shutil.rmtree(tempdir)
+            return None
+
+        finally:
+            os.chdir(curdir)
+
+    else:
+        pb2_file = os.path.join(proto.getParent(), proto.getName())
+        shutil.copy(pb2_file, tempdir)
+        module = proto.getName().replace('.py', '')
+
+    try:
+        os.chdir(tempdir)
+        sys.path.append(os.curdir)
+        return importlib.import_module(module)
+
+    finally:
+        sys.path.pop()
+        os.chdir(curdir)
+        shutil.rmtree(tempdir)
