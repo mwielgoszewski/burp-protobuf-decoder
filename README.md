@@ -36,5 +36,10 @@ Frequently Asked Questions
 
 1. What if I have a proto file descriptor?
 
-	> Well then, I hope to one day support creating proto messages from a proto
-	> file descriptor at runtime.
+	> Load it from a Protobuf tab by right-clicking. Messages will
+	> automatically decode from then on. If you wish to manually
+	> deserialize as another type, this option is available to you via a
+	> right-click context menu once a proto is loaded.
+
+	> By loading a .proto, you can also edit/tamper that deserialize messages
+	> and they'll be serialized properly for you when sent along.
