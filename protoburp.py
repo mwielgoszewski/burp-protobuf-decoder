@@ -317,7 +317,7 @@ class DeserializeProtoActionListener(ActionListener):
 
             self.tab.editor.setText(str(message))
             self.tab.editor.setEditable(True)
-            self._current = (content, message, info)
+            self.tab._current = (content, message, info)
 
         except Exception as error:
             title = "Error parsing message as %s!" % (self.descriptor.name, )
