@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-from burp import IBurpExtender, IMessageEditorTab, IMessageEditorTabFactory, ITab
+from burp import IBurpExtender, IContextMenuFactory, IMessageEditorTab, IMessageEditorTabFactory, ITab
 
 from google.protobuf.reflection import ParseMessage as parse_message
 from google.protobuf.text_format import Merge as merge_message
@@ -22,7 +22,7 @@ CONTENT_PROTOBUF = 'application/x-protobuf'
 PROTO_FILENAME_EXTENSION_FILTER = FileNameExtensionFilter("*.proto, *.py", ["proto", "py"])
 
 
-class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
+class BurpExtender(IBurpExtender, IContextMenuFactory, IMessageEditorTabFactory):
     EXTENSION_NAME = "Protobuf Editor"
 
     def registerExtenderCallbacks(self, callbacks):
@@ -57,6 +57,7 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
         self.chooser.setMultiSelectionEnabled(True)
 
         callbacks.setExtensionName(self.EXTENSION_NAME)
+        callbacks.registerContextMenuFactory(self)
         callbacks.registerMessageEditorTabFactory(self)
 
         # Holding off on adding an extension tab until more advanced
@@ -65,7 +66,21 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
         #callbacks.addSuiteTab(ProtobufTab(self))
         return
 
+    def createMenuItems(self, invocation):
+        contexts = (
+                invocation.CONTEXT_MESSAGE_EDITOR_REQUEST,
+                invocation.CONTEXT_MESSAGE_EDITOR_RESPONSE,
+                invocation.CONTEXT_MESSAGE_VIEWER_REQUEST,
+                invocation.CONTEXT_MESSAGE_VIEWER_RESPONSE,
+                )
+
+        if invocation.getInvocationContext() in contexts:
+            loadMenu = JMenuItem("Load .proto")
+            loadMenu.addActionListener(LoadProtoActionListener(self))
+            return [loadMenu]
+
     def createNewInstance(self, controller, editable):
+        controller = ProtobufMessageEditorController(controller, self)
         return ProtobufEditorTab(self, controller, editable)
 
 
