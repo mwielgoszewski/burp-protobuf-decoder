@@ -51,6 +51,11 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
 
         self.descriptors = OrderedDict()
 
+        self.chooser = JFileChooser()
+        self.chooser.addChoosableFileFilter(PROTO_FILENAME_EXTENSION_FILTER)
+        self.chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES)
+        self.chooser.setMultiSelectionEnabled(True)
+
         callbacks.setExtensionName(self.EXTENSION_NAME)
         callbacks.registerMessageEditorTabFactory(self)
 
@@ -73,12 +78,8 @@ class ProtobufEditorTab(IMessageEditorTab):
         self.controller = controller
         self.editable = editable
 
-        self.chooser = JFileChooser()
-        self.chooser.addChoosableFileFilter(PROTO_FILENAME_EXTENSION_FILTER)
-        self.chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES)
-        self.chooser.setMultiSelectionEnabled(True)
-
         self.descriptors = extender.descriptors
+        self.chooser = extender.chooser
 
         self.listener = LoadProtoActionListener(self)
 
