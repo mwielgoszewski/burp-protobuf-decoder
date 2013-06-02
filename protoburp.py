@@ -80,7 +80,6 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, IMessageEditorTabFactory)
             return [loadMenu]
 
     def createNewInstance(self, controller, editable):
-        controller = ProtobufMessageEditorController(controller, self)
         return ProtobufEditorTab(self, controller, editable)
 
 
