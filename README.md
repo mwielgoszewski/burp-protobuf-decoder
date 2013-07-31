@@ -36,10 +36,11 @@ Frequently Asked Questions
 
 1. What if I have a proto file descriptor?
 
-	> Load it from a Protobuf tab by right-clicking. Messages will
-	> automatically decode from then on. If you wish to manually
-	> deserialize as another type, this option is available to you via a
-	> right-click context menu once a proto is loaded.
+	> Load it from a Protobuf tab by right-clicking. Messages will be
+	> automatically decoded from then on. If you wish to manually
+	> deserialize a message as different type, this option is available to you 
+	> via a right-click context menu once a proto is loaded.
 
-	> By loading a .proto, you can also edit/tamper that deserialize messages
-	> and they'll be serialized properly for you when sent along.
+	> By loading a .proto, you can edit and tamper protobuf messages.
+	> The extension will automatically serialize messages back before
+	> they're sent along.
