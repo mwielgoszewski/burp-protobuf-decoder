@@ -304,11 +304,15 @@ class LoadProtoActionListener(ActionListener):
                     self.chooser.setCurrentDirectory(selectedFile)
 
                     for protoFile in selectedFile.listFiles(ListProtoFileFilter()):
-                        modules.append(compile_and_import_proto(protoFile))
+                        module = compile_and_import_proto(protoFile)
+                        if module:
+                            modules.append(module)
 
                 else:
                     self.chooser.setCurrentDirectory(selectedFile.getParentFile())
-                    modules.append(compile_and_import_proto(selectedFile))
+                    module = compile_and_import_proto(selectedFile)
+                    if module:
+                        modules.append(module)
 
             for pb2 in modules:
                 descriptors = self.descriptors.setdefault(pb2.__name__, {})
