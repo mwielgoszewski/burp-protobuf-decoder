@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
 import importlib
+import inspect
 import os
 import shutil
 import subprocess
@@ -295,6 +296,14 @@ class LoadProtoActionListener(ActionListener):
         self.descriptors = tab.descriptors
         self.tab = tab
 
+    def updateDescriptors(self, name, module):
+        if module.DESCRIPTOR.message_types_by_name and name not in self.descriptors:
+            descriptors = self.descriptors.setdefault(name, {})
+            descriptors.update(module.DESCRIPTOR.message_types_by_name)
+
+        for name, module_ in inspect.getmembers(module, lambda x: hasattr(x, 'descriptor_pb2')):
+            self.updateDescriptors(name, module_)
+
     def actionPerformed(self, event):
         if self.chooser.showOpenDialog(None) == JFileChooser.APPROVE_OPTION:
             modules = []
@@ -315,8 +324,7 @@ class LoadProtoActionListener(ActionListener):
                         modules.append(module)
 
             for pb2 in modules:
-                descriptors = self.descriptors.setdefault(pb2.__name__, {})
-                descriptors.update(pb2.DESCRIPTOR.message_types_by_name)
+                self.updateDescriptors(pb2.__name__, pb2)
 
         return
 
