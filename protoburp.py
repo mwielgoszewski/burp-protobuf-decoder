@@ -349,7 +349,9 @@ def compile_and_import_proto(proto):
     curdir = os.path.abspath(os.curdir)
     tempdir = tempfile.mkdtemp()
 
-    if os.path.splitext(proto.getName())[-1] == '.proto':
+    is_proto = os.path.splitext(proto.getName())[-1] == '.proto'
+
+    if is_proto:
         try:
             os.chdir(os.path.abspath(proto.getParent()))
             subprocess.check_call(['protoc', '--python_out',
@@ -364,13 +366,15 @@ def compile_and_import_proto(proto):
             os.chdir(curdir)
 
     else:
-        pb2_file = os.path.join(proto.getParent(), proto.getName())
-        shutil.copy(pb2_file, tempdir)
         module = proto.getName().replace('.py', '')
 
     try:
-        os.chdir(tempdir)
-        sys.path.append(os.curdir)
+        if is_proto:
+            os.chdir(tempdir)
+        else:
+            os.chdir(proto.getParent())
+
+        sys.path.append(os.path.abspath(os.curdir))
         return importlib.import_module(module)
 
     finally:
