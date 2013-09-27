@@ -14,6 +14,7 @@ from google.protobuf.reflection import ParseMessage as parse_message
 from google.protobuf.text_format import Merge as merge_message
 
 from java.awt.event import ActionListener, MouseAdapter
+from java.lang import RuntimeException
 from java.io import FileFilter
 from javax.swing import JButton, JFileChooser, JMenu, JMenuItem, JOptionPane, JPanel, JPopupMenu
 from javax.swing.filechooser import FileNameExtensionFilter
@@ -304,27 +305,30 @@ class LoadProtoActionListener(ActionListener):
         for name, module_ in inspect.getmembers(module, lambda x: hasattr(x, 'descriptor_pb2')):
             self.updateDescriptors(name, module_)
 
-    def actionPerformed(self, event):
-        if self.chooser.showOpenDialog(None) == JFileChooser.APPROVE_OPTION:
-            modules = []
+        return
 
-            for selectedFile in self.chooser.getSelectedFiles():
-                if selectedFile.isDirectory():
-                    self.chooser.setCurrentDirectory(selectedFile)
+    def importProtoFiles(self, selectedFiles):
+        for selectedFile in selectedFiles:
+            if selectedFile.isDirectory():
+                self.chooser.setCurrentDirectory(selectedFile)
+                self.importProtoFiles(selectedFile.listFiles(ListProtoFileFilter()))
+            else:
+                self.chooser.setCurrentDirectory(selectedFile.getParentFile())
 
-                    for protoFile in selectedFile.listFiles(ListProtoFileFilter()):
-                        module = compile_and_import_proto(protoFile)
-                        if module:
-                            modules.append(module)
-
-                else:
-                    self.chooser.setCurrentDirectory(selectedFile.getParentFile())
+                try:
                     module = compile_and_import_proto(selectedFile)
                     if module:
-                        modules.append(module)
+                        yield module
 
-            for pb2 in modules:
-                self.updateDescriptors(pb2.__name__, pb2)
+                except (Exception, RuntimeException) as error:
+                    JOptionPane.showMessageDialog(None,
+                        '%s: %s' % (error.message, selectedFile),
+                        'Error importing proto!', JOptionPane.ERROR_MESSAGE)
+
+    def actionPerformed(self, event):
+        if self.chooser.showOpenDialog(None) == JFileChooser.APPROVE_OPTION:
+            for module in self.importProtoFiles(self.chooser.getSelectedFiles()):
+                self.updateDescriptors(module.__name__, module)
 
         return
 
