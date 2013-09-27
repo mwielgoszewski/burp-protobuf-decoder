@@ -47,7 +47,7 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, IMessageEditorTabFactory)
 
         except (OSError, RuntimeError) as error:
             self.callbacks.getStderr().write(
-                    "Error calling protoc: %s" % (error.message, ))
+                    "Error calling protoc: %s\n" % (error.message, ))
 
         if not self.enabled:
             return
