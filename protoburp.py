@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 
 from burp import IBurpExtender, IContextMenuFactory, IMessageEditorTab, IMessageEditorTabFactory, ITab
 
@@ -90,6 +91,7 @@ class ProtobufEditorTab(IMessageEditorTab):
 
     def __init__(self, extender, controller, editable):
         self.extender = extender
+        self.callbacks = extender.callbacks
         self.helpers = extender.helpers
         self.controller = controller
         self.editable = editable
@@ -321,6 +323,11 @@ class LoadProtoActionListener(ActionListener):
                         yield module
 
                 except (Exception, RuntimeException) as error:
+                    self.tab.callbacks.getStderr().write(
+                        'Error importing proto %s!\n' % (selectedFile, ))
+
+                    traceback.print_exc(file=self.tab.callbacks.getStderr())
+
                     JOptionPane.showMessageDialog(None,
                         '%s: %s' % (error.message, selectedFile),
                         'Error importing proto!', JOptionPane.ERROR_MESSAGE)
