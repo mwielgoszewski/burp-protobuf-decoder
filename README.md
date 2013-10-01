@@ -9,6 +9,7 @@ Prerequisites
 
 1. Download and install the [protoc](https://code.google.com/p/protobuf/).
 2. Burp Professional 1.5.01+
+3. Jython 2.7+ [Jython 2.7 beta1 Standalone](http://www.jython.org/downloads.html)
 
 
 Install
