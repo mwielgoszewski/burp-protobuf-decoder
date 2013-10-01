@@ -362,7 +362,7 @@ class DeserializeProtoActionListener(ActionListener):
                 error.message, title, JOptionPane.ERROR_MESSAGE)
 
         return
-            
+
 
 def compile_and_import_proto(proto):
     curdir = os.path.abspath(os.curdir)
