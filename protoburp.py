@@ -268,21 +268,23 @@ class LoadProtoMenuMouseListener(MouseAdapter):
             popup = JPopupMenu()
             popup.add(loadMenu)
 
-            deserializeAsMenu = JMenu("Deserialize As...")
+            if self.tab.descriptors:
 
-            popup.addSeparator()
-            popup.add(deserializeAsMenu)
+                deserializeAsMenu = JMenu("Deserialize As...")
 
-            for pb2, descriptors in self.tab.descriptors.iteritems():
-                subMenu = JMenu(pb2)
-                deserializeAsMenu.add(subMenu)
+                popup.addSeparator()
+                popup.add(deserializeAsMenu)
 
-                for name, descriptor in descriptors.iteritems():
-                    protoMenu = JMenuItem(name)
-                    protoMenu.addActionListener(
-                        DeserializeProtoActionListener(self.tab, descriptor))
+                for pb2, descriptors in self.tab.descriptors.iteritems():
+                    subMenu = JMenu(pb2)
+                    deserializeAsMenu.add(subMenu)
 
-                    subMenu.add(protoMenu)
+                    for name, descriptor in descriptors.iteritems():
+                        protoMenu = JMenuItem(name)
+                        protoMenu.addActionListener(
+                            DeserializeProtoActionListener(self.tab, descriptor))
+
+                        subMenu.add(protoMenu)
 
             popup.show(event.getComponent(), event.getX(), event.getY())
 
