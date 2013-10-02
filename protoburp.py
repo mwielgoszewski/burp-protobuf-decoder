@@ -14,7 +14,7 @@ import traceback
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(
     inspect.getfile(inspect.currentframe()))), 'Lib'))
 
-from burp import IBurpExtender, IContextMenuFactory, IMessageEditorTab, IMessageEditorTabFactory, ITab
+from burp import IBurpExtender, IMessageEditorTab, IMessageEditorTabFactory, ITab
 
 from google.protobuf.reflection import ParseMessage as parse_message
 from google.protobuf.text_format import Merge as merge_message
@@ -30,7 +30,7 @@ CONTENT_PROTOBUF = 'application/x-protobuf'
 PROTO_FILENAME_EXTENSION_FILTER = FileNameExtensionFilter("*.proto, *.py", ["proto", "py"])
 
 
-class BurpExtender(IBurpExtender, IContextMenuFactory, IMessageEditorTabFactory):
+class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
     EXTENSION_NAME = "Protobuf Editor"
 
     def registerExtenderCallbacks(self, callbacks):
@@ -65,7 +65,6 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, IMessageEditorTabFactory)
         self.chooser.setMultiSelectionEnabled(True)
 
         callbacks.setExtensionName(self.EXTENSION_NAME)
-        callbacks.registerContextMenuFactory(self)
         callbacks.registerMessageEditorTabFactory(self)
 
         # Holding off on adding an extension tab until more advanced
@@ -73,19 +72,6 @@ class BurpExtender(IBurpExtender, IContextMenuFactory, IMessageEditorTabFactory)
 
         #callbacks.addSuiteTab(ProtobufTab(self))
         return
-
-    def createMenuItems(self, invocation):
-        contexts = (
-                invocation.CONTEXT_MESSAGE_EDITOR_REQUEST,
-                invocation.CONTEXT_MESSAGE_EDITOR_RESPONSE,
-                invocation.CONTEXT_MESSAGE_VIEWER_REQUEST,
-                invocation.CONTEXT_MESSAGE_VIEWER_RESPONSE,
-                )
-
-        if invocation.getInvocationContext() in contexts:
-            loadMenu = JMenuItem("Load .proto")
-            loadMenu.addActionListener(LoadProtoActionListener(self))
-            return [loadMenu]
 
     def createNewInstance(self, controller, editable):
         return ProtobufEditorTab(self, controller, editable)
