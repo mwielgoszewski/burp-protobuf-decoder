@@ -9,6 +9,11 @@ import sys
 import tempfile
 import traceback
 
+# Patch dir this file was loaded from into the path
+# (Burp doesn't do it automatically)
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(
+    inspect.getfile(inspect.currentframe()))), 'Lib'))
+
 from burp import IBurpExtender, IContextMenuFactory, IMessageEditorTab, IMessageEditorTabFactory, ITab
 
 from google.protobuf.reflection import ParseMessage as parse_message
