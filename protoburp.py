@@ -25,22 +25,26 @@ from java.io import FileFilter
 from javax.swing import JButton, JFileChooser, JMenu, JMenuItem, JOptionPane, JPanel, JPopupMenu
 from javax.swing.filechooser import FileNameExtensionFilter
 
+from ui import ParameterProcessingRulesTable
+
 
 CONTENT_PROTOBUF = 'application/x-protobuf'
-PROTO_FILENAME_EXTENSION_FILTER = FileNameExtensionFilter("*.proto, *.py", ["proto", "py"])
+PROTO_FILENAME_EXTENSION_FILTER = FileNameExtensionFilter("*.proto, *.py",
+                                                          ["proto", "py"])
 
 
-class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
+class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab):
     EXTENSION_NAME = "Protobuf Editor"
 
     def __init__(self):
         self.descriptors = OrderedDict()
-        self.parameters = OrderedDict()
 
         self.chooser = JFileChooser()
         self.chooser.addChoosableFileFilter(PROTO_FILENAME_EXTENSION_FILTER)
         self.chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES)
         self.chooser.setMultiSelectionEnabled(True)
+
+        self.table = ParameterProcessingRulesTable(self)
 
     def registerExtenderCallbacks(self, callbacks):
         self.callbacks = callbacks
@@ -68,15 +72,17 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
 
         callbacks.setExtensionName(self.EXTENSION_NAME)
         callbacks.registerMessageEditorTabFactory(self)
-
-        # Holding off on adding an extension tab until more advanced
-        # options are introduced.
-
-        #callbacks.addSuiteTab(ProtobufTab(self))
+        callbacks.addSuiteTab(self)
         return
 
     def createNewInstance(self, controller, editable):
         return ProtobufEditorTab(self, controller, editable)
+
+    def getTabCaption(self):
+        return self.EXTENSION_NAME
+
+    def getUiComponent(self):
+        return self.table
 
 
 class ProtobufEditorTab(IMessageEditorTab):
@@ -117,7 +123,7 @@ class ProtobufEditorTab(IMessageEditorTab):
 
             # check if request contains a specific parameter
             for parameter in info.getParameters():
-                if parameter.getName() in self.extender.parameters:
+                if parameter.getName() in self.extender.table.getParameterRules():
                     return True
 
             headers = info.getHeaders()
@@ -149,7 +155,7 @@ class ProtobufEditorTab(IMessageEditorTab):
 
         parameter = None
 
-        for name, rules in self.extender.parameters.iteritems():
+        for name, rules in self.extender.table.getParameterRules().iteritems():
             parameter = self.helpers.getRequestParameter(content, name)
 
             if parameter is not None:
@@ -223,7 +229,7 @@ class ProtobufEditorTab(IMessageEditorTab):
                 serialized = message.SerializeToString()
 
                 if parameter is not None:
-                    rules = self.extender.parameters.get(parameter.getName(), {})
+                    rules = self.extender.table.getParameterRules().get(parameter.getName(), {})
 
                     for rule in rules.get('after', []):
                         serialized = rule(serialized)
@@ -253,22 +259,6 @@ class ProtobufEditorTab(IMessageEditorTab):
 
     def getSelectedData(self):
         return self.editor.getSelectedText()
-
-
-class ProtobufTab(ITab):
-    TAB_CAPTION = 'Protobuf'
-
-    def __init__(self, protobufEditor):
-        button = JButton("Load .proto ...")
-        button.addActionListener(protobufEditor.listener)
-        self.panel = JPanel()
-        self.panel.add(button)
-
-    def getTabCaption(self):
-        return self.TAB_CAPTION
-
-    def getUiComponent(self):
-        return self.panel
 
 
 class LoadProtoMenuMouseListener(MouseAdapter):
@@ -384,7 +374,7 @@ class DeserializeProtoActionListener(ActionListener):
                         content, parameter.getName())
 
                 if param is not None:
-                    rules = self.tab.extender.parameters.get(parameter.getName(), {})
+                    rules = self.tab.extender.table.getParameterRules().get(parameter.getName(), {})
                     body = param.getValue().encode('utf-8')
 
                     for rule in rules.get('before', []):
