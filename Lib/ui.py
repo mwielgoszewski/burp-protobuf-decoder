@@ -150,6 +150,14 @@ class ParameterProcessingRulesTable(JPanel):
                 rules.setdefault(name, {}).setdefault(when.lower(), []).append(RULES.get(rule, ''))
         return rules
 
+    @property
+    def rules(self):
+        return self.table.getModel().data
+
+    @rules.setter
+    def rules(self, data):
+        self.table.getModel().data = data
+
 
 class ParameterProcessingRulesTableModel(DefaultTableModel):
     DEFAULT_VALUES = ('PARAM_URL', '', 'Before', '', Boolean(0))
