@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from collections import OrderedDict
+import base64
 import importlib
 import inspect
+import json
 import os
 import shutil
 import subprocess
@@ -14,13 +16,14 @@ import traceback
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(
     inspect.getfile(inspect.currentframe()))), 'Lib'))
 
-from burp import IBurpExtender, IMessageEditorTab, IMessageEditorTabFactory, ITab
+from burp import IBurpExtender, IMessageEditorTab, IMessageEditorTabFactory, ITab, \
+        IExtensionStateListener
 
 from google.protobuf.reflection import ParseMessage as parse_message
 from google.protobuf.text_format import Merge as merge_message
 
 from java.awt.event import ActionListener, MouseAdapter
-from java.lang import RuntimeException
+from java.lang import Boolean, RuntimeException
 from java.io import FileFilter
 from javax.swing import JButton, JFileChooser, JMenu, JMenuItem, JOptionPane, JPanel, JPopupMenu
 from javax.swing.filechooser import FileNameExtensionFilter
@@ -33,7 +36,7 @@ PROTO_FILENAME_EXTENSION_FILTER = FileNameExtensionFilter("*.proto, *.py",
                                                           ["proto", "py"])
 
 
-class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab):
+class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab, IExtensionStateListener):
     EXTENSION_NAME = "Protobuf Editor"
 
     def __init__(self):
@@ -70,7 +73,18 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab):
         if not self.enabled:
             return
 
+        saved_rules = callbacks.loadExtensionSetting('rules')
+
+        if saved_rules:
+            rules = json.loads(base64.b64decode(saved_rules))
+
+            for rule in rules:
+                rule[-1] = Boolean(rule[-1])
+
+            self.table.rules = rules
+
         callbacks.setExtensionName(self.EXTENSION_NAME)
+        callbacks.registerExtensionStateListener(self)
         callbacks.registerMessageEditorTabFactory(self)
         callbacks.addSuiteTab(self)
         return
@@ -83,6 +97,16 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab):
 
     def getUiComponent(self):
         return self.table
+
+    def extensionUnloaded(self):
+        rules = self.table.rules
+
+        for rule in rules:
+            rule[-1] = bool(rule[-1])
+
+        self.callbacks.saveExtensionSetting(
+                'rules', base64.b64encode(json.dumps(rules)))
+        return
 
 
 class ProtobufEditorTab(IMessageEditorTab):
