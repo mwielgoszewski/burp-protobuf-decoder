@@ -33,6 +33,15 @@ PROTO_FILENAME_EXTENSION_FILTER = FileNameExtensionFilter("*.proto, *.py", ["pro
 class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
     EXTENSION_NAME = "Protobuf Editor"
 
+    def __init__(self):
+        self.descriptors = OrderedDict()
+        self.parameters = OrderedDict()
+
+        self.chooser = JFileChooser()
+        self.chooser.addChoosableFileFilter(PROTO_FILENAME_EXTENSION_FILTER)
+        self.chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES)
+        self.chooser.setMultiSelectionEnabled(True)
+
     def registerExtenderCallbacks(self, callbacks):
         self.callbacks = callbacks
         self.helpers = callbacks.getHelpers()
@@ -56,13 +65,6 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory):
 
         if not self.enabled:
             return
-
-        self.descriptors = OrderedDict()
-
-        self.chooser = JFileChooser()
-        self.chooser.addChoosableFileFilter(PROTO_FILENAME_EXTENSION_FILTER)
-        self.chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES)
-        self.chooser.setMultiSelectionEnabled(True)
 
         callbacks.setExtensionName(self.EXTENSION_NAME)
         callbacks.registerMessageEditorTabFactory(self)
@@ -92,7 +94,7 @@ class ProtobufEditorTab(IMessageEditorTab):
 
         self.listener = LoadProtoActionListener(self)
 
-        self._current = (None, None, None)
+        self._current = (None, None, None, None)
 
         self.editor = extender.callbacks.createTextEditor()
         self.editor.setEditable(editable)
@@ -111,15 +113,23 @@ class ProtobufEditorTab(IMessageEditorTab):
             return False
 
         if isRequest:
-            headers = self.helpers.analyzeRequest(content).getHeaders()
+            info = self.helpers.analyzeRequest(content)
+
+            # check if request contains a specific parameter
+            for parameter in info.getParameters():
+                if parameter.getName() in self.extender.parameters:
+                    return True
+
+            headers = info.getHeaders()
         else:
             headers = self.helpers.analyzeResponse(content).getHeaders()
 
         # first header is the request/response line
         for header in headers[1:]:
-            if header.lower().startswith('content-type:'):
-                value = header.split(':', 1)[1].strip()
-                if value.lower() == CONTENT_PROTOBUF:
+            name, _, value = header.partition(':')
+            if name.lower() == 'content-type':
+                value = value.lower().strip()
+                if value == CONTENT_PROTOBUF:
                     return True
 
         return False
@@ -135,7 +145,20 @@ class ProtobufEditorTab(IMessageEditorTab):
         else:
             info = self.helpers.analyzeResponse(content)
 
-        body = content[info.getBodyOffset():]
+        body = content[info.getBodyOffset():].tostring()
+
+        parameter = None
+
+        for name, rules in self.extender.parameters.iteritems():
+            parameter = self.helpers.getRequestParameter(content, name)
+
+            if parameter is not None:
+                value = parameter.getValue().encode('utf-8')
+
+                for rule in rules.get('before', []):
+                    value = rule(value)
+
+                break
 
         # Loop through all proto descriptors loaded
 
@@ -143,7 +166,7 @@ class ProtobufEditorTab(IMessageEditorTab):
             for name, descriptor in descriptors.iteritems():
 
                 try:
-                    message = parse_message(descriptor, body.tostring())
+                    message = parse_message(descriptor, body)
                 except Exception:
                     continue
 
@@ -155,7 +178,7 @@ class ProtobufEditorTab(IMessageEditorTab):
                 if message.IsInitialized():
                     self.editor.setText(str(message))
                     self.editor.setEditable(True)
-                    self._current = (content, message, info)
+                    self._current = (content, message, info, parameter)
                     return
 
         # If we get to this point, then no loaded protos could deserialize
@@ -181,11 +204,11 @@ class ProtobufEditorTab(IMessageEditorTab):
             self.editor.setText(output)
 
         self.editor.setEditable(False)
-        self._current = (content, None, info)
+        self._current = (content, None, info, parameter)
         return
 
     def getMessage(self):
-        content, message, info = self._current
+        content, message, info, parameter = self._current
 
         if message is not None and self.isModified():
 
@@ -198,7 +221,19 @@ class ProtobufEditorTab(IMessageEditorTab):
                 merge_message(self.editor.getText().tostring(), message)
                 headers = info.getHeaders()
                 serialized = message.SerializeToString()
-                return self.helpers.buildHttpMessage(headers, serialized)
+
+                if parameter is not None:
+                    rules = self.extender.parameters.get(parameter.getName(), {})
+
+                    for rule in rules.get('after', []):
+                        serialized = rule(serialized)
+
+                    param = self.helpers.buildParameter(
+                            parameter.getName(), serialized, parameter.getType())
+
+                    return self.helpers.updateParameter(content, param)
+                else:
+                    return self.helpers.buildHttpMessage(headers, serialized)
 
             except Exception as error:
                 JOptionPane.showMessageDialog(self.getUiComponent(),
@@ -339,15 +374,27 @@ class DeserializeProtoActionListener(ActionListener):
         self.descriptor = descriptor
 
     def actionPerformed(self, event):
-        content, message, info = self.tab._current
+        content, message, info, parameter = self.tab._current
 
         try:
-            body = content[info.getBodyOffset():]
-            message = parse_message(self.descriptor, body.tostring())
+            body = content[info.getBodyOffset():].tostring()
+
+            if parameter is not None:
+                param = self.tab.helpers.getRequestParameter(
+                        content, parameter.getName())
+
+                if param is not None:
+                    rules = self.tab.extender.parameters.get(parameter.getName(), {})
+                    body = param.getValue().encode('utf-8')
+
+                    for rule in rules.get('before', []):
+                        body = rule(body)
+
+            message = parse_message(self.descriptor, body)
 
             self.tab.editor.setText(str(message))
             self.tab.editor.setEditable(True)
-            self.tab._current = (content, message, info)
+            self.tab._current = (content, message, info, parameter)
 
         except Exception as error:
             title = "Error parsing message as %s!" % (self.descriptor.name, )
