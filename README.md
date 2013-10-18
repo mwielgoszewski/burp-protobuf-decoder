@@ -41,3 +41,14 @@ Frequently Asked Questions
 	> By loading a .proto, you can edit and tamper protobuf messages.
 	> The extension will automatically serialize messages back before
 	> they're sent along.
+
+1. Can I deserialize protobufs passed as URL or form parameters?
+
+    > Yes, you can. In the 'Protobuf Editor' tab, add a parameter to
+    > the table. You can specify additional pre and post processing
+    > rules, to handle base64 encoding or zlib compression. Don't forget
+    > to check the enabled box for each rule once you're done.
+
+    > Note, the editor tab window may not immediately pick up the changes.
+    > You can work around this issue by cycling through requests (anything
+    > that'd trigger the editor tab to reload itself)
