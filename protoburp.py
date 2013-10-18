@@ -153,10 +153,10 @@ class ProtobufEditorTab(IMessageEditorTab):
             parameter = self.helpers.getRequestParameter(content, name)
 
             if parameter is not None:
-                value = parameter.getValue().encode('utf-8')
+                body = parameter.getValue().encode('utf-8')
 
                 for rule in rules.get('before', []):
-                    value = rule(value)
+                    body = rule(body)
 
                 break
 
