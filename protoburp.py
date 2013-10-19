@@ -78,6 +78,9 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab, IExtensionStat
         if saved_rules:
             rules = json.loads(base64.b64decode(saved_rules))
 
+            # For checkboxes to be rendered in a table model, the
+            # type has to be java.lang.Boolean, not a Python bool.
+
             for rule in rules:
                 rule[-1] = Boolean(rule[-1])
 
@@ -99,7 +102,14 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab, IExtensionStat
         return self.table
 
     def extensionUnloaded(self):
+        if not self.table.rules:
+            return
+
         rules = self.table.rules
+
+        # The default JSONENcoder cannot dump a java.lang.Boolean type,
+        # so convert it to a Python bool. (We'll have to change it back
+        # when loading the rules again.
 
         for rule in rules:
             rule[-1] = bool(rule[-1])
@@ -146,6 +156,7 @@ class ProtobufEditorTab(IMessageEditorTab):
             info = self.helpers.analyzeRequest(content)
 
             # check if request contains a specific parameter
+
             for parameter in info.getParameters():
                 if parameter.getName() in self.extender.table.getParameterRules():
                     return True
@@ -155,6 +166,7 @@ class ProtobufEditorTab(IMessageEditorTab):
             headers = self.helpers.analyzeResponse(content).getHeaders()
 
         # first header is the request/response line
+
         for header in headers[1:]:
             name, _, value = header.partition(':')
             if name.lower() == 'content-type':
@@ -176,6 +188,8 @@ class ProtobufEditorTab(IMessageEditorTab):
             info = self.helpers.analyzeResponse(content)
 
         body = content[info.getBodyOffset():].tostring()
+
+        # process parameters via rules defined in Protobuf Editor ui tab
 
         parameter = None
 
