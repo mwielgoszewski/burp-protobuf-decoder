@@ -12,6 +12,7 @@ from base64 import b64encode, b64decode, urlsafe_b64encode, urlsafe_b64decode
 from binascii import hexlify, unhexlify
 from zlib import compress, decompress
 
+
 PARAMETER_TYPES = {
     'PARAM_BODY': IParameter.PARAM_BODY,
     'PARAM_COOKIE': IParameter.PARAM_COOKIE,
@@ -35,7 +36,7 @@ RULES = {
     'hex decode': unhexlify,
 
 }
-    
+
 
 class ParameterProcessingRulesTable(JPanel):
     def __init__(self, extender=None, *rows):
@@ -105,7 +106,7 @@ class ParameterProcessingRulesTable(JPanel):
 
     def initParameterColumn(self, table):
         parameterTypes = JComboBox(sorted(PARAMETER_TYPES.keys()))
-        parameterTypes.setSelectedItem('PARAM_URL')
+        parameterTypes.setSelectedItem('PARAM_BODY')
         parameterColumn = table.getColumnModel().getColumn(0)
         parameterColumn.setCellEditor(DefaultCellEditor(parameterTypes))
 
@@ -118,7 +119,7 @@ class ParameterProcessingRulesTable(JPanel):
         ruleColumn = table.getColumnModel().getColumn(3)
         ruleColumn.setCellEditor(DefaultCellEditor(ruleTypes))
         return
-        
+
     def initColumnSizes(self, table):
         model = table.getModel()
         values = model.DEFAULT_VALUES
@@ -160,7 +161,7 @@ class ParameterProcessingRulesTable(JPanel):
 
 
 class ParameterProcessingRulesTableModel(DefaultTableModel):
-    DEFAULT_VALUES = ('PARAM_URL', '', 'Before', '', Boolean(0))
+    DEFAULT_VALUES = ('PARAM_BODY', '', 'Before', '', Boolean(0))
     COLUMN_NAMES = ('Type', 'Name', 'When', 'Rule', 'Enabled')
 
     def __init__(self, *rows):
@@ -193,7 +194,7 @@ class ParameterProcessingRulesTableModel(DefaultTableModel):
         return True
 
     def addRow(self, row=None):
-        self.data.append(row or ['PARAM_URL', '', 'Before', '', Boolean(0)])
+        self.data.append(row or ['PARAM_BODY', '', 'Before', '', Boolean(0)])
         self.fireTableRowsInserted(len(self.data) - 1, len(self.data) - 1)
         return
 
