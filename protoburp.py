@@ -31,7 +31,7 @@ from javax.swing.filechooser import FileNameExtensionFilter
 from ui import ParameterProcessingRulesTable
 
 
-CONTENT_PROTOBUF = 'application/x-protobuf'
+CONTENT_PROTOBUF = ('application/x-protobuf', 'application/octet-stream')
 PROTO_FILENAME_EXTENSION_FILTER = FileNameExtensionFilter("*.proto, *.py",
                                                           ["proto", "py"])
 
@@ -171,7 +171,7 @@ class ProtobufEditorTab(IMessageEditorTab):
             name, _, value = header.partition(':')
             if name.lower() == 'content-type':
                 value = value.lower().strip()
-                if value == CONTENT_PROTOBUF:
+                if value in CONTENT_PROTOBUF:
                     return True
 
         return False
