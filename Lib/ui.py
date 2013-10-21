@@ -155,10 +155,6 @@ class ParameterProcessingRulesTable(JPanel):
     def rules(self):
         return self.table.getModel().data
 
-    @rules.setter
-    def rules(self, data):
-        self.table.getModel().data = data
-
 
 class ParameterProcessingRulesTableModel(DefaultTableModel):
     DEFAULT_VALUES = ('PARAM_BODY', '', 'Before', '', Boolean(0))
