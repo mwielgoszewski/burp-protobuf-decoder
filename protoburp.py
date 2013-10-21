@@ -47,8 +47,6 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab, IExtensionStat
         self.chooser.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES)
         self.chooser.setMultiSelectionEnabled(True)
 
-        self.table = ParameterProcessingRulesTable(self)
-
     def registerExtenderCallbacks(self, callbacks):
         self.callbacks = callbacks
         self.helpers = callbacks.getHelpers()
@@ -73,6 +71,7 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab, IExtensionStat
         if not self.enabled:
             return
 
+        rules = []
         saved_rules = callbacks.loadExtensionSetting('rules')
 
         if saved_rules:
@@ -84,7 +83,7 @@ class BurpExtender(IBurpExtender, IMessageEditorTabFactory, ITab, IExtensionStat
             for rule in rules:
                 rule[-1] = Boolean(rule[-1])
 
-            self.table.rules = rules
+        self.table = ParameterProcessingRulesTable(self, *rules)
 
         callbacks.setExtensionName(self.EXTENSION_NAME)
         callbacks.registerExtensionStateListener(self)
