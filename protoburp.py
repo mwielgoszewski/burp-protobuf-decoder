@@ -186,6 +186,8 @@ class ProtobufEditorTab(IMessageEditorTab):
         else:
             info = self.helpers.analyzeResponse(content)
 
+        # by default, let's assume the entire body is a protobuf message
+
         body = content[info.getBodyOffset():].tostring()
 
         # process parameters via rules defined in Protobuf Editor ui tab
@@ -196,6 +198,11 @@ class ProtobufEditorTab(IMessageEditorTab):
             parameter = self.helpers.getRequestParameter(content, name)
 
             if parameter is not None:
+
+                # no longer use the entire message body as the protobuf
+                # message, just the value of the parameter according
+                # to our ui defined rules
+
                 body = parameter.getValue().encode('utf-8')
 
                 for rule in rules.get('before', []):
