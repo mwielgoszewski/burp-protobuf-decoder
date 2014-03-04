@@ -2,7 +2,7 @@ from java.awt import Dimension, GridBagConstraints, GridBagLayout, Insets
 from java.awt.event import ActionListener
 from java.lang import Boolean, Double
 
-from javax.swing import DefaultCellEditor, JButton, \
+from javax.swing import BorderFactory, DefaultCellEditor, JButton, \
         JComboBox, JPanel, JScrollPane, JTable
 from javax.swing.table import DefaultTableModel, TableRowSorter
 
@@ -57,8 +57,14 @@ RULES = {
 
 
 class ParameterProcessingRulesTable(JPanel):
-    def __init__(self, extender=None, *rows):
+    def __init__(self, extender, *rows, **kwargs):
         self.extender = extender
+
+        if 'title' in kwargs:
+            self.setBorder(
+                BorderFactory.createCompoundBorder(
+                    BorderFactory.createTitledBorder(kwargs.get('title', '')),
+                    BorderFactory.createEmptyBorder(5, 5, 5, 5)))
 
         self.table = table = JTable(ParameterProcessingRulesTableModel(*rows))
         table.setPreferredScrollableViewportSize(Dimension(500, 70))
