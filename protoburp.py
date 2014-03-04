@@ -206,7 +206,11 @@ class ProtobufEditorTab(IMessageEditorTab):
                 body = parameter.getValue().encode('utf-8')
 
                 for rule in rules.get('before', []):
-                    body = rule(body)
+                    try:
+                        body = rule(body)
+                    except Exception as error:
+                        traceback.print_exc(file=self.callbacks.getStderr())
+                        raise error
 
                 break
 
@@ -276,7 +280,11 @@ class ProtobufEditorTab(IMessageEditorTab):
                     rules = self.extender.table.getParameterRules().get(parameter.getName(), {})
 
                     for rule in rules.get('after', []):
-                        serialized = rule(serialized)
+                        try:
+                            serialized = rule(serialized)
+                        except Exception as error:
+                            traceback.print_exc(file=self.callbacks.getStderr())
+                            raise error
 
                     param = self.helpers.buildParameter(
                             parameter.getName(), serialized, parameter.getType())
@@ -422,7 +430,11 @@ class DeserializeProtoActionListener(ActionListener):
                     body = param.getValue().encode('utf-8')
 
                     for rule in rules.get('before', []):
-                        body = rule(body)
+                        try:
+                            body = rule(body)
+                        except Exception as error:
+                            traceback.print_exc(file=self.tab.callbacks.getStderr())
+                            raise error
 
             message = parse_message(self.descriptor, body)
 
