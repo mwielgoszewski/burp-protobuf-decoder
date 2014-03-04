@@ -13,7 +13,7 @@ from base64 import b64encode, b64decode, urlsafe_b64encode, urlsafe_b64decode
 from binascii import hexlify, unhexlify
 from gzip import GzipFile
 from urllib import quote_plus, unquote_plus
-from zlib import compress, decompress
+from zlib import compress as zlib_compress, decompress as zlib_decompress
 
 
 def gzip_compress(data):
@@ -51,8 +51,8 @@ RULES = {
     'hex decode': unhexlify,
     'gzip compress': gzip_compress,
     'gzip decompress': gzip_decompress,
-    'zlib compress': compress,
-    'zlib decompress': decompress,
+    'zlib compress': zlib_compress,
+    'zlib decompress': zlib_decompress,
 }
 
 
