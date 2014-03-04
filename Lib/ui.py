@@ -8,9 +8,25 @@ from javax.swing.table import DefaultTableModel, TableRowSorter
 
 from burp import IParameter
 
+from cStringIO import StringIO
 from base64 import b64encode, b64decode, urlsafe_b64encode, urlsafe_b64decode
 from binascii import hexlify, unhexlify
+from gzip import GzipFile
+from urllib import quote_plus, unquote_plus
 from zlib import compress, decompress
+
+
+def gzip_compress(data):
+    sio = StringIO()
+    gzf = GzipFile(fileobj=sio, mode='wb')
+    gzf.write(data)
+    gzf.close()
+    return sio.getvalue()
+
+
+def gzip_decompress(data):
+    gzf = GzipFile(fileobj=StringIO(data), mode='r')
+    return gzf.read()
 
 
 PARAMETER_TYPES = {
@@ -24,17 +40,19 @@ PARAMETER_TYPES = {
 }
 
 RULES = {
-
     '': lambda x:x,
-    'zlib compress': compress,
-    'zlib decompress': decompress,
     'base64 encode': b64encode,
     'base64 decode': b64decode,
+    'url decode': unquote_plus,
+    'url encode': quote_plus,
     'url-base64 encode': urlsafe_b64encode,
     'url-base64 decode': urlsafe_b64decode,
     'hex encode': hexlify,
     'hex decode': unhexlify,
-
+    'gzip compress': gzip_compress,
+    'gzip decompress': gzip_decompress,
+    'zlib compress': compress,
+    'zlib decompress': decompress,
 }
 
 
